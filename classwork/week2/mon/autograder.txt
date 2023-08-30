@@ -1,0 +1,16 @@
+TEST 1: Source file exists
+PASS
+
+TEST 2: Source file compiles without warnings
+PASS
+
+TEST 3: program is correct
+1c1
+< Hello, World!
+---
+> Hello, world!
+FAIL
+
+There is at least one mistake
+Last updated on:
+Mon Aug 28 02:53:32 PM MDT 2023
