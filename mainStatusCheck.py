@@ -1,4 +1,4 @@
-from statusCheckPackage import siteScraping
+import siteScraping
 import time
 
 #################TODO: USER UPDATES THIS INFO
