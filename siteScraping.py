@@ -9,6 +9,134 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+def amazonlogin(username, password, file, custompath, chromedriverpath):
+    # Amazon login page
+    url = 'https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.com%2Flog%2Fs%3Fk%3Dlog%2Bin%26ref_%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=usflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0'
+
+    # Set up Selenium
+    chrome_options = Options()
+    chrome_options.add_argument("--disable-extensions")
+    chrome_options.add_argument("--disable-popup-blocking")
+    chrome_options.add_argument("--disable-plugins-discovery")
+    # chrome_options.add_argument("--headless")  # Can run in headless
+    chrome_options.add_argument(f"--user-data-dir={custompath}")
+
+    service = Service(rf'{chromedriverpath}')
+    driver = webdriver.Chrome(service=service, options=chrome_options)
+
+    try:
+        # Load the page
+        driver.get(url)
+
+        # Wait for the page to load and locate the email input field
+        emailenter = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, ".a-input-text.a-span12.auth-autofocus.auth-required-field"))
+        )
+
+        # Enter Username
+        emailenter.clear()
+        emailenter.send_keys(username)
+
+        # Locate and click the continue button
+        continuebutton = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, ".a-button.a-button-span12.a-button-primary"))
+        )
+        continuebutton.click()
+
+        # Wait for the password input field to appear
+        passwordenter = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located((By.CSS_SELECTOR, ".a-input-text.a-span12.auth-required-field"))
+        )
+
+        # Enter Password
+        passwordenter.clear()
+        passwordenter.send_keys(password)
+
+        # Locate and click the sign-in button
+        signinbutton = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, ".a-button.a-button-span12.a-button-primary"))
+        )
+        signinbutton.click()
+
+        # Check the language of the website
+        amazonlanguage = WebDriverWait(driver, 20).until(
+            EC.presence_of_element_located(
+                (By.CSS_SELECTOR, "#icp-nav-flyout"))
+        )
+        # Change the language of the website
+        if 'EN' not in amazonlanguage.text:
+            amazonlanguage.click()
+            english = WebDriverWait(driver, 20).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, ".a-row.a-spacing-mini"))
+            )
+            english.click()
+            confirm = WebDriverWait(driver, 20).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, ".a-button.a-spacing-top-mini.a-button-primary"))
+            )
+            confirm.click()
+
+
+        # Open your account page
+        youraccount = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, "#nav-link-accountList"))
+        )
+        youraccount.click()
+
+        # Select your orders
+        yourorderscard = WebDriverWait(driver, 20).until(
+            EC.element_to_be_clickable((By.CSS_SELECTOR, ".ya-card-cell"))
+        )
+        yourorderscard.click()
+
+        # Return the driver after successful login
+        return driver
+
+    except Exception as e:
+        file.write(f"Unable to log into Amazon: {str(e)}\n")
+        driver.quit()
+        return None
+
+# Get the status description
+def checkupdatedstatus(orderyear, row, orderid, file, driver):
+        try:
+            # Wait for the page to load and locate the email input field
+            searchbar = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, ".a-spacing-none"))
+            )
+
+            # Enter Username
+            searchbar.clear()
+            searchbar.send_keys(orderid)
+
+            # Enter your search
+            enterbutton = WebDriverWait(driver, 20).until(
+                EC.element_to_be_clickable((By.CSS_SELECTOR, "search-bar__button-container"))
+            )
+            enterbutton.click()
+
+
+            temp = 'Null'
+
+        except Exception as e:
+            file.write(f"Error for row {row}: {str(e)}\n")
+            driver.quit()
+            return 'Unknown'
+
+        # Determine if the package was delivered or not
+        if 'Unknown' in temp:
+            delivered = 'Unknown'
+        elif 'Delivered' in temp:
+            delivered = 'Delivered'
+        elif 'Shipped' in temp:
+            delivered = 'Shipped'
+        elif 'Not Shipped' in temp:
+            delivered = 'Not Shipped'
+        else:
+            delivered = 'Unknown'
+        return delivered
+
 # Load arrays onto csv file to flag undelivered rows, and add row of info describing
 def infoupdate(filename, statuses, undelivered):
     # Reads original csv file
@@ -31,190 +159,21 @@ def infoupdate(filename, statuses, undelivered):
     # Write updated DataFrame to a new CSV file
     df.to_csv(f'updated_{filename}', index=False)
 
-def checkstatus(carrier_name, tracking_number, row, file, custompath, chromedriverpath):
-    url = f'https://www.aftership.com/track/{tracking_number}'
-
-    # Set up Selenium
-    chrome_options = Options()
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-popup-blocking")
-    chrome_options.add_argument("--disable-plugins-discovery")
-    chrome_options.add_argument("--incognito")  # Open Chrome in incognito mode
-    chrome_options.add_argument(f"--user-data-dir={custompath}")  # Specify a custom user data directory
-
-    service = Service(rf'{chromedriverpath}')
-    driver = webdriver.Chrome(service=service, options=chrome_options)
-
-    try:
-        # Load the page
-        driver.get(url)
-
-        # Wait for the shadow host element to be present
-        shadow_host = WebDriverWait(driver, 20).until(
-            EC.presence_of_element_located((By.CSS_SELECTOR, "div#tracking"))
-        )
-
-        # Define a function to get the shadow root element using JavaScript
-        def expand_shadow_element(element):
-            shadow_root = driver.execute_script('return arguments[0].shadowRoot', element)
-            return shadow_root
-
-        # Get the shadow root
-        shadow_root = expand_shadow_element(shadow_host)
-
-        # Check to see if package was found
-        carrier_info_element = WebDriverWait(shadow_root, 20).until(
-            lambda d: d.find_element(By.CSS_SELECTOR, ".text-blue-600.cursor-pointer.inline-block")
-        )
-
-        if 'Select carrier' in carrier_info_element.text:
-            js_code = """
-                const shadowHost = document.querySelector('div#tracking');
-                const shadowRoot = shadowHost.shadowRoot;
-                const clickableElement = shadowRoot.querySelector('.text-blue-600.cursor-pointer.inline-block');
-                const childElement = clickableElement.querySelector('.font-semibold');
-                if (childElement && childElement.innerText.includes('Select carrier')) {
-                    childElement.click();  // Click the element
-                    return true;  // Indicate the click was performed
-                } else {
-                    return false;  // Indicate the element was not found
-                }
-            """
-
-            # Execute the JavaScript to click the element
-            clicked = driver.execute_script(js_code)
-
-            if clicked:
-                time.sleep(2)  # Adjust sleep time as necessary
-
-                search_bar = WebDriverWait(driver, 20).until(
-                    lambda d: expand_shadow_element(d.find_element(By.CSS_SELECTOR, "div#tracking")).find_element(
-                        By.CSS_SELECTOR,
-                        ".appearance-none.bg-gray-100.rounded-md.focus\\:outline-none.focus\\:shadow-cool-gray-outline.block.w-full.pl-10.pr-12.transition.ease-in-out.duration-150.py-2")
-                )
-
-                # Clear the search bar if needed
-                search_bar.clear()
-                search_bar.send_keys(searchNames(carrier_name))
-
-                # Wait for the search results to load
-                time.sleep(2)
-                search_result = WebDriverWait(driver, 20).until(
-                    lambda d: expand_shadow_element(d.find_element(By.CSS_SELECTOR, "div#tracking")).find_element(
-                        By.CSS_SELECTOR, ".p-3.hover\\:bg-gray-100.rounded.cursor-pointer.w-1\\/4")
-                )
-                search_result.click()
-                time.sleep(5)  # Adjust sleep time as necessary
-
-        # Locate the tracking info element inside the shadow root
-        tracking_info_element = WebDriverWait(shadow_root, 20).until(
-            lambda d: d.find_element(By.CSS_SELECTOR, ".ml-3.flex-1.flex-shrink-0")
-        )
-
-        # Extract the text from the element
-        temp = tracking_info_element.text
-
-    except Exception as e:
-        file.write(f"Error for row {row}: {str(e)}\n")
-        driver.quit()
-        return 'Unknown'
-
-    # Clear browsing data (history, cookies, cache, etc.)
-    driver.execute_script("window.localStorage.clear();")
-    driver.execute_script("window.sessionStorage.clear();")
-    driver.delete_all_cookies()
-    driver.quit()
-
-    # Determine if the package was delivered or not
-    if 'Unknown' in temp:
-        delivered = 'Unknown'
-    elif 'Delivered' in temp:
-        delivered = 'Delivered'
-    elif 'Shipped' in temp:
-        delivered = 'Shipped'
-    elif 'Not Shipped' in temp:
-        delivered = 'Not Shipped'
-    else:
-        delivered = 'Unknown'
-    return delivered
-
-# Read file and return array with carrier name, tracking number, and row number
+# Read file and return array with order year, row number, and order id
 def inforead(filename):
     # Reads file and takes important info into a DataFrame
-    df = pd.read_csv(filename, usecols=['Carrier Name & Tracking Number'])
+    df = pd.read_csv(filename, usecols=['Order ID', 'Order Date'])
 
-    # Initialize lists to store separated values
-    carrier_names = []
-    tracking_numbers = []
-
-    # Process each row in the DataFrame
-    for index, row in df.iterrows():
-        carrier_tracking = row['Carrier Name & Tracking Number']
-
-        # Extract carrier name (before the first parenthesis)
-        if "(" in carrier_tracking:
-            carrier_name = carrier_tracking.split("(")[0].strip()
-        else:
-            carrier_name = carrier_tracking.strip()
-        carrier_names.append(carrier_name)
-
-        # Extract tracking numbers (within parentheses, handling multiple tracking numbers)
-        tracking_numbers_list = []
-        while "and" in carrier_tracking:
-            start = carrier_tracking.find("(") + 1
-            end = carrier_tracking.find(")")
-            if start < end:
-                tracking_number = carrier_tracking[start:end].strip()
-                tracking_numbers_list.append(tracking_number)
-                carrier_tracking = carrier_tracking[carrier_tracking.find("and") + 3:].strip()
-            else:
-                break
-
-        # Handle the last or single tracking number
-        if "(" in carrier_tracking and ")" in carrier_tracking:
-            start = carrier_tracking.find("(") + 1
-            end = carrier_tracking.find(")")
-            if start < end:
-                tracking_number = carrier_tracking[start:end].strip()
-                tracking_numbers_list.append(tracking_number)
-
-        tracking_numbers.append(tracking_numbers_list)
+    # Extract the first four characters of 'Order Date'
+    df['Order Date'] = df['Order Date'].str.slice(0, 4)
 
     # Prepare the final array
     final_list = []
     for i in range(len(df)):
-        for tn in tracking_numbers[i]:
-            final_list.append([carrier_names[i], tn, i + 2])
+        order_id = df.loc[i, 'Order ID']
+        order_date = df.loc[i, 'Order Date']
+        final_list.append([order_date, i + 2, order_id])
 
     final = np.array(final_list)
 
     return final
-
-# Names adjusted for searchbar
-def searchNames(carrier_name):
-    if 'AMZN' in carrier_name or 'Amazon' in carrier_name:
-        return 'Amazon Shipping'
-    if 'UPS' in carrier_name or 'ups' in carrier_name:
-        return 'UPS'
-    if 'DHL' in carrier_name:
-        return 'DHL'
-    if 'USPS' in carrier_name:
-        return 'USPS'
-    if 'Yun' in carrier_name:
-        return 'YunExpress'
-    if 'Tfroce' in carrier_name or 'Tforce' in carrier_name:
-        return 'Tforce'
-    if 'Ontrac' in carrier_name:
-        return 'Ontrac'
-    if 'Yanwen' in carrier_name:
-        return 'Yanwen'
-    if 'EUB' in carrier_name or 'EPacket' in carrier_name:
-        return 'China EMS'
-    if 'Newgistics' in carrier_name:
-        return 'Newgistics'
-    if 'Hong Kong' in carrier_name or "HK Post" in carrier_name:
-        return 'Hong Kong'
-    if 'China' in carrier_name:
-        return 'China Post'
-    else:
-        return 'Amazon'
