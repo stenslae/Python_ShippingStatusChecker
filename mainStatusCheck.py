@@ -24,10 +24,13 @@ statuses = []
 undelivered = []
 for i in range(len(data)):
     delivered = siteScraping.checkstatus(data[i][0], data[i][1], data[i][2], file, driver)
-    status = [data[i][2], delivered]
-    statuses.append(status)
-    if 'Delivered' not in delivered:
-        undelivered.append(data[i][2])
+    if delivered != None:
+        status = [data[i][2], delivered]
+        statuses.append(status)
+        if 'Delivered' not in delivered:
+            undelivered.append(data[i][2])
+    else:
+        break
     print(f'Row {data[i][2]} has been checked')
     time.sleep(5)  # Delay between requests to avoid being blocked
 
