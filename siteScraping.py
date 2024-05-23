@@ -2,13 +2,16 @@
 import pandas as pd
 import numpy as np
 import time
+from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support.ui import Select, WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 
+# Logs into Amazon and goes to your orders page
 def amazonlogin(username, password, file, custompath, chromedriverpath):
     # Amazon login page
     url = 'https://www.amazon.com/ap/signin?openid.pape.max_auth_age=0&openid.return_to=https%3A%2F%2Fwww.amazon.com%2Flog%2Fs%3Fk%3Dlog%2Bin%26ref_%3Dnav_signin&openid.identity=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.assoc_handle=usflex&openid.mode=checkid_setup&openid.claimed_id=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0%2Fidentifier_select&openid.ns=http%3A%2F%2Fspecs.openid.net%2Fauth%2F2.0'
@@ -98,12 +101,29 @@ def amazonlogin(username, password, file, custompath, chromedriverpath):
         return None
 
 # Get the status description
-def checkupdatedstatus(orderyear, row, orderid, file, driver):
+def checkstatus(orderyear, row, orderid, file, driver):
+    # Check the current date
+    current_date = datetime.utcnow()
+    parsed_date = datetime.strptime(orderyear, "%Y-%m-%dT%H:%M:%SZ")
+    six_months_ago = current_date - relativedelta(months=6)
+
+    # Determine if we can look at the delivery status
+    if parsed_date < six_months_ago:
+        return None
+    else:
         try:
+            # Select the year of orders you are looking at
+            timecontainer = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located(
+                    (By.CSS_SELECTOR, "#time-filter"))
+            )
+            dropdown = Select(timecontainer)
+            dropdown.select_by_value(f'year-{orderyear[0:4]}')
+
             # Wait for the page to load and locate the email input field
             searchbar = WebDriverWait(driver, 20).until(
                 EC.presence_of_element_located(
-                    (By.CSS_SELECTOR, ".a-spacing-none"))
+                    (By.CSS_SELECTOR, "#searchOrdersInput"))
             )
 
             # Enter Username
@@ -112,29 +132,45 @@ def checkupdatedstatus(orderyear, row, orderid, file, driver):
 
             # Enter your search
             enterbutton = WebDriverWait(driver, 20).until(
-                EC.element_to_be_clickable((By.CSS_SELECTOR, "search-bar__button-container"))
+                EC.element_to_be_clickable((By.CSS_SELECTOR, ".a-button-input"))
             )
             enterbutton.click()
 
+            # Wait for the parent container to load
+            parent = WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.CSS_SELECTOR, "#ordersContainer"))
+            )
 
-            temp = 'Null'
+            # Once the parent container is loaded, find child elements within it
+            #TODO: verify that children are actually found
+            childs = parent.find_elements(By.CSS_SELECTOR, '.a-row.shipment-top-row.js-shipment-info-container')
+            isblue = False
+
+            for child_element in childs:
+                result = child_element.text + ' '
+                if not isblue:
+                    isblue = True; #TODO: add statement to check color
 
         except Exception as e:
             file.write(f"Error for row {row}: {str(e)}\n")
-            driver.quit()
             return 'Unknown'
 
-        # Determine if the package was delivered or not
-        if 'Unknown' in temp:
+        # Determine if the package was delivered or not (descending priority for multiple packages case)
+        # TODO: Update test cases for Amazon UI
+        if 'Unknown' in element_text:
             delivered = 'Unknown'
-        elif 'Delivered' in temp:
+        elif 'Not Shipped' in element_text:
             delivered = 'Delivered'
-        elif 'Shipped' in temp:
+        elif 'Shipped' in element_text or 'Arriving' in element_text:
             delivered = 'Shipped'
-        elif 'Not Shipped' in temp:
+        elif 'Delivered' in element_text or 'Returned' in element_text:
             delivered = 'Not Shipped'
         else:
             delivered = 'Unknown'
+
+        # Debugging: Print final delivery status
+        print("Delivery Status:", delivered)
+        driver.back()
         return delivered
 
 # Load arrays onto csv file to flag undelivered rows, and add row of info describing
@@ -159,13 +195,10 @@ def infoupdate(filename, statuses, undelivered):
     # Write updated DataFrame to a new CSV file
     df.to_csv(f'updated_{filename}', index=False)
 
-# Read file and return array with order year, row number, and order id
+# Read file and return array with carrier name, tracking number, row number, and order id
 def inforead(filename):
     # Reads file and takes important info into a DataFrame
     df = pd.read_csv(filename, usecols=['Order ID', 'Order Date'])
-
-    # Extract the first four characters of 'Order Date'
-    df['Order Date'] = df['Order Date'].str.slice(0, 4)
 
     # Prepare the final array
     final_list = []
