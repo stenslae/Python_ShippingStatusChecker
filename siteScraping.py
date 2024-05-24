@@ -142,34 +142,31 @@ def checkstatus(orderyear, row, orderid, file, driver):
             )
 
             # Once the parent container is loaded, find child elements within it
-            #TODO: verify that children are actually found
             childs = parent.find_elements(By.CSS_SELECTOR, '.a-row.shipment-top-row.js-shipment-info-container')
             isblue = False
+            result = ""
 
             for child_element in childs:
-                result = child_element.text + ' '
+                result += child_element.text + ' '
                 if not isblue:
-                    isblue = True; #TODO: add statement to check color
+                    try:
+                        child_element = parent.find_element(By.CSS_SELECTOR, '.a-size-medium.a-color-success.a-text-bold')
+                        isblue = True
+                    except:
+                        isblue = isblue
 
         except Exception as e:
             file.write(f"Error for row {row}: {str(e)}\n")
             return 'Unknown'
 
         # Determine if the package was delivered or not (descending priority for multiple packages case)
-        # TODO: Update test cases for Amazon UI
-        if 'Unknown' in element_text:
-            delivered = 'Unknown'
-        elif 'Not Shipped' in element_text:
+        if 'Delivered' in result:
             delivered = 'Delivered'
-        elif 'Shipped' in element_text or 'Arriving' in element_text:
+        elif isblue:
             delivered = 'Shipped'
-        elif 'Delivered' in element_text or 'Returned' in element_text:
-            delivered = 'Not Shipped'
         else:
-            delivered = 'Unknown'
+            delivered = 'Not Shipped'
 
-        # Debugging: Print final delivery status
-        print("Delivery Status:", delivered)
         driver.back()
         return delivered
 
