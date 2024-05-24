@@ -21,7 +21,7 @@ def amazonlogin(username, password, file, custompath, chromedriverpath):
     chrome_options.add_argument("--disable-extensions")
     chrome_options.add_argument("--disable-popup-blocking")
     chrome_options.add_argument("--disable-plugins-discovery")
-    # chrome_options.add_argument("--headless")  # Can run in headless
+    chrome_options.add_argument("--headless")  # If you get a timeout error, comment this line and complete the recapta for the login
     chrome_options.add_argument(f"--user-data-dir={custompath}")
 
     service = Service(rf'{chromedriverpath}')
