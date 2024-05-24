@@ -32,7 +32,6 @@ for i in range(len(data)):
     else:
         break
     print(f'Row {data[i][2]} has been checked')
-    time.sleep(5)  # Delay between requests to avoid being blocked
 
 # Clear browsing data (history, cookies, cache, etc.)
 driver.execute_script("window.localStorage.clear();")
